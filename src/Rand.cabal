@@ -1,0 +1,17 @@
+name:          rand-vars
+version:       0.1
+author:        Romain Edelmann
+maintainer:    Romain Edelmann
+synopsis:      Random variable library, with Functor, Applicative and Monad instances.
+description:   Random variable library, with Functor, Applicative and Monad instances.
+cabal-version: >= 1.2
+build-type:    Simple
+category: 
+license:       GPL
+
+library
+  build-depends:   base >=4.0 && <5.0, 
+                   array >= 0.4.0.0,
+                   random >= 1.0
+  exposed-modules: Rand
+  extensions:      Rank2Types
