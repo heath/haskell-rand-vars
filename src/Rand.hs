@@ -13,6 +13,7 @@ import System.Random
 import Data.Array.IArray ((!), listArray, Array)
 import Control.Applicative
 import Data.List (foldl', find)
+import qualified Data.IntervalMap as IM
 
 -- | Random variable of @a@.
 newtype Rand a = Rand { runRand :: RandomGen g => g -> (a, g) }
@@ -60,20 +61,26 @@ inRange r = Rand (\g -> randomR r g)
 fromFreqs :: Real b => [(a, b)] -> Rand a
 fromFreqs fs = Rand (\g ->
 	let (from, to) = genRange g in
-	let range = toRational (to - from) in
-	let s = toRational $ sum $ map snd fs in
-	let ratio = range / s in
-	let xs = computeThreshold ratio fs in
-	let (i, g') = next g in
-	let di = toRational (i - from) in
-	let Just (x, _) = find (\(x, s) -> di <= s) xs in (x, g'))
+	let range      = toRational (to - from) in
+	let ratio      = freqSum / range in
+	let (i, g')    = next g in
+	let j          = (*) ratio $ toRational (i - from) in
+	case (IM.containing) intervalMap j of
+		[(_, x)] -> (x, g')
+		_        -> error "Index not in the map."
+	)
 	where
-		computeThreshold :: Real b => Rational -> [(a, b)] -> [(a, Rational)]
-		computeThreshold r fs = reverse $ foldl' (go ((*r) . toRational)) [] fs
-	
-		go :: (b -> Rational) -> [(a, Rational)] -> (a, b) -> [(a, Rational)]
-		go steps [] (x, f) = let step = steps f in if step > 0 then [(x, step)] else []
-		go steps xs@((_, d):_) (x, f) = let step = steps f in if step > 0 then (x, d + step):xs else xs
+		elems = preprocess fs
+
+		freqSum = sum $ map snd elems
+
+		intervalMap = IM.fromAscList $ computeIntervals 0 elems
+
+		preprocess = map (\(x, f) -> (x, toRational f)) . filter ((>0) . snd)
+
+		computeIntervals _ [] = undefined
+		computeIntervals lower ((v, f):[]) = let upper = (lower + f) in (IM.ClosedInterval lower upper, v):[]
+		computeIntervals lower ((v, f):xs) = let upper = (lower + f) in (IM.IntervalCO lower upper, v):(computeIntervals upper xs)
 
 -- | Alias for @(,)@.
 withFreq :: Real b => a -> b -> (a, b)
