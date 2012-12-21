@@ -3,7 +3,43 @@ window.onload = function () {pageLoad();setSynopsis("mini_Rand.html");};
 //]]>
 </script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><a href="index.html">Contents</a></li><li><a href="doc-index.html">Index</a></li></ul><p class="caption">rand-vars-0.1: Random variable library, with Functor, Applicative and Monad instances.</p></div><div id="content"><div id="module-header"><table class="info"><tr><th>Safe Haskell</th><td>Safe-Infered</td></tr></table><p class="caption">Rand</p></div><div id="table-of-contents"><p class="caption">Contents</p><ul><li><a href="#g:1">Evaluation
 </a></li><li><a href="#g:2">Creation
-</a></li></ul></div><div id="synopsis"><p id="control.syn" class="caption expander" onclick="toggleSection('syn')">Synopsis</p><ul id="section.syn" class="hide" onclick="toggleSection('syn')"><li class="src short"><span class="keyword">newtype</span>  <a href="#t:Rand">Rand</a> a = <a href="#v:Rand">Rand</a> {<ul class="subs"><li><a href="#v:runRand">runRand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:RandomGen">RandomGen</a> g =&gt; g -&gt; (a, g)</li></ul>}</li><li class="src short"><a href="#v:evalRand">evalRand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:RandomGen">RandomGen</a> g =&gt; <a href="Rand.html#t:Rand">Rand</a> a -&gt; g -&gt; a</li><li class="src short"><a href="#v:execRand">execRand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:RandomGen">RandomGen</a> g =&gt; <a href="Rand.html#t:Rand">Rand</a> a -&gt; g -&gt; g</li><li class="src short"><a href="#v:rand">rand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:Random">Random</a> a =&gt; <a href="Rand.html#t:Rand">Rand</a> a</li><li class="src short"><a href="#v:oneOf">oneOf</a> ::  [a] -&gt; <a href="Rand.html#t:Rand">Rand</a> a</li><li class="src short"><a href="#v:inRange">inRange</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:Random">Random</a> a =&gt; (a, a) -&gt; <a href="Rand.html#t:Rand">Rand</a> a</li><li class="src short"><a href="#v:fromFreqs">fromFreqs</a> :: <a href="/Library/Frameworks/GHC.framework/Versions/7.4.1-i386/usr/share/doc/ghc/html/libraries/base-4.5.0.0/Prelude.html#t:Real">Real</a> b =&gt; [(a, b)] -&gt; <a href="Rand.html#t:Rand">Rand</a> a</li><li class="src short"><a href="#v:withFreq">withFreq</a> :: <a href="/Library/Frameworks/GHC.framework/Versions/7.4.1-i386/usr/share/doc/ghc/html/libraries/base-4.5.0.0/Prelude.html#t:Real">Real</a> b =&gt; a -&gt; b -&gt; (a, b)</li></ul></div><div id="interface"><h1>Documentation</h1><div class="top"><p class="src"><span class="keyword">newtype</span>  <a name="t:Rand" class="def">Rand</a> a </p><div class="doc"><p>Random variable of <code>a</code>.
+</a></li></ul></div><div id="description"><p class="caption">Description</p><div class="doc"><p>This module provides efficient and intuitive ways to build and manipulate random variables of all kinds.
+</p><p>The following is an example of generating combinations for a slot machine.
+</p><pre> import Rand
+ import System.Random
+ import Control.Applicative
+ import Control.Monad
+
+ data Slot = Lemon | Cherry | Strawberry | Orange | Bar | Seven deriving (Enum, Show)
+
+ data Combination = Combination Slot Slot Slot deriving Show
+
+ fairSlot = oneOf [Lemon .. Seven]
+ fairCombination = Combination &lt;$&gt; fairSlot &lt;*&gt; fairSlot &lt;*&gt; fairSlot
+
+ biasedSlot = fromFreqs [Lemon `withFreq` 1, 
+                         Cherry `withFreq` 1, 
+                         Strawberry `withFreq` 1.2, 
+                         Orange `withFreq` 1.1,
+                         Bar `withFreq` 0.9,
+                         Seven `withFreq` 0.8]
+
+ biasedCombination = Combination &lt;$&gt; biasedSlot &lt;*&gt; biasedSlot &lt;*&gt; biasedSlot
+
+
+ aTripToAMachine = do
+           combination &lt;- fromFreqs [fairCombination `withFreq` 10, biasedCombination `withFreq` 5]
+           rounds      &lt;- inRange (5, 50)
+           replicateM rounds combination
+
+ aTripToTheCasino = do
+           trips &lt;- fmap (*3) $ inRange (1, 10)
+           fmap concat $ replicateM trips aTripToAMachine
+
+ main = do
+      gen &lt;- getStdGen
+      putStrLn $ show $ aTripToTheCasino `evalRand` gen  
+</pre></div></div><div id="synopsis"><p id="control.syn" class="caption expander" onclick="toggleSection('syn')">Synopsis</p><ul id="section.syn" class="hide" onclick="toggleSection('syn')"><li class="src short"><span class="keyword">newtype</span>  <a href="#t:Rand">Rand</a> a = <a href="#v:Rand">Rand</a> {<ul class="subs"><li><a href="#v:runRand">runRand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:RandomGen">RandomGen</a> g =&gt; g -&gt; (a, g)</li></ul>}</li><li class="src short"><a href="#v:evalRand">evalRand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:RandomGen">RandomGen</a> g =&gt; <a href="Rand.html#t:Rand">Rand</a> a -&gt; g -&gt; a</li><li class="src short"><a href="#v:execRand">execRand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:RandomGen">RandomGen</a> g =&gt; <a href="Rand.html#t:Rand">Rand</a> a -&gt; g -&gt; g</li><li class="src short"><a href="#v:rand">rand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:Random">Random</a> a =&gt; <a href="Rand.html#t:Rand">Rand</a> a</li><li class="src short"><a href="#v:oneOf">oneOf</a> ::  [a] -&gt; <a href="Rand.html#t:Rand">Rand</a> a</li><li class="src short"><a href="#v:inRange">inRange</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:Random">Random</a> a =&gt; (a, a) -&gt; <a href="Rand.html#t:Rand">Rand</a> a</li><li class="src short"><a href="#v:fromFreqs">fromFreqs</a> :: <a href="/Library/Frameworks/GHC.framework/Versions/7.4.1-i386/usr/share/doc/ghc/html/libraries/base-4.5.0.0/Prelude.html#t:Real">Real</a> b =&gt; [(a, b)] -&gt; <a href="Rand.html#t:Rand">Rand</a> a</li><li class="src short"><a href="#v:withFreq">withFreq</a> :: <a href="/Library/Frameworks/GHC.framework/Versions/7.4.1-i386/usr/share/doc/ghc/html/libraries/base-4.5.0.0/Prelude.html#t:Real">Real</a> b =&gt; a -&gt; b -&gt; (a, b)</li></ul></div><div id="interface"><h1>Documentation</h1><div class="top"><p class="src"><span class="keyword">newtype</span>  <a name="t:Rand" class="def">Rand</a> a </p><div class="doc"><p>Random variable of <code>a</code>.
 </p></div><div class="subs constructors"><p class="caption">Constructors</p><table><tr><td class="src"><a name="v:Rand" class="def">Rand</a></td><td class="doc empty">&nbsp;</td></tr><tr><td colspan="2"><div class="subs fields"><p class="caption">Fields</p><dl><dt class="src"><a name="v:runRand" class="def">runRand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:RandomGen">RandomGen</a> g =&gt; g -&gt; (a, g)</dt><dd class="doc empty">&nbsp;</dd></dl><div class="clear"></div></div></td></tr></table></div><div class="subs instances"><p id="control.i:Rand" class="caption collapser" onclick="toggleSection('i:Rand')">Instances</p><div id="section.i:Rand" class="show"><table><tr><td class="src"><a href="/Library/Frameworks/GHC.framework/Versions/7.4.1-i386/usr/share/doc/ghc/html/libraries/base-4.5.0.0/Control-Monad.html#t:Monad">Monad</a> <a href="Rand.html#t:Rand">Rand</a></td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="/Library/Frameworks/GHC.framework/Versions/7.4.1-i386/usr/share/doc/ghc/html/libraries/base-4.5.0.0/Control-Monad.html#t:Functor">Functor</a> <a href="Rand.html#t:Rand">Rand</a></td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="/Library/Frameworks/GHC.framework/Versions/7.4.1-i386/usr/share/doc/ghc/html/libraries/base-4.5.0.0/Control-Applicative.html#t:Applicative">Applicative</a> <a href="Rand.html#t:Rand">Rand</a></td><td class="doc empty">&nbsp;</td></tr></table></div></div></div><h1 id="g:1">Evaluation
 </h1><div class="top"><p class="src"><a name="v:evalRand" class="def">evalRand</a> :: <a href="/Library/Haskell/ghc-7.4.1/lib/random-1.0.1.1/doc/html/System-Random.html#t:RandomGen">RandomGen</a> g =&gt; <a href="Rand.html#t:Rand">Rand</a> a -&gt; g -&gt; a</p><div class="doc"><p>Run the random variable and returns only its value.
    The new generator is lost.

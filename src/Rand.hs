@@ -1,9 +1,45 @@
 {-# LANGUAGE Rank2Types #-}
 
+-- | This module provides efficient and intuitive ways to build and manipulate random variables of all kinds.
+--
+--   The following is an example of generating combinations for a slot machine.
+--
+-- > import Rand
+-- > import System.Random
+-- > import Control.Applicative
+-- > import Control.Monad
+-- >
+-- > data Slot = Lemon | Cherry | Strawberry | Orange | Bar | Seven deriving (Enum, Show)
+-- >
+-- > data Combination = Combination Slot Slot Slot deriving Show
+-- >
+-- > fairSlot = oneOf [Lemon .. Seven]
+-- > fairCombination = Combination <$> fairSlot <*> fairSlot <*> fairSlot
+-- >
+-- > biasedSlot = fromFreqs [Lemon `withFreq` 1, 
+-- >                         Cherry `withFreq` 1, 
+-- >                         Strawberry `withFreq` 1.2, 
+-- >                         Orange `withFreq` 1.1,
+-- >                         Bar `withFreq` 0.9,
+-- >                         Seven `withFreq` 0.8]
+-- >
+-- > biasedCombination = Combination <$> biasedSlot <*> biasedSlot <*> biasedSlot
+-- >
+-- >
+-- > aTripToAMachine = do
+-- >           combination <- fromFreqs [fairCombination `withFreq` 10, biasedCombination `withFreq` 5]
+-- >           rounds      <- inRange (5, 50)
+-- >           replicateM rounds combination
+-- >
+-- > aTripToTheCasino = do
+-- >           trips <- fmap (*3) $ inRange (1, 10)
+-- >           fmap concat $ replicateM trips aTripToAMachine
+-- >
+-- > main = evalRandIO aTripToTheCasino >>= print
 module Rand(
 	Rand(..), 
 	-- * Evaluation
-	evalRand, execRand, 
+	evalRand, execRand, evalRandIO,
 	-- * Creation
 	rand, oneOf, inRange,
 	fromFreqs, withFreq
@@ -40,6 +76,15 @@ evalRand v g = fst $ v `runRand` g
 -- | Run the random variable and returns only the new @RandomGen@.
 execRand :: RandomGen g => Rand a -> g -> g
 execRand v g = snd $ v `runRand` g
+
+-- | Run the random variable and returns only its value.
+--   The new generator is set as the standart generator.
+evalRandIO :: Rand a -> IO a
+evalRandIO r = do
+	g <- getStdGen
+	let (x, g') = r `runRand` g
+	setStdGen g'
+	return x
 
 -- | Equiprobable distribution among the elements of the list.
 oneOf :: [a] -> Rand a
