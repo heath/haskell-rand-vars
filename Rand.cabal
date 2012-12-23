@@ -1,13 +1,18 @@
-name:          rand-vars
-version:       0.1
-author:        Romain Edelmann
-maintainer:    Romain Edelmann
-synopsis:      Random variable library, with Functor, Applicative and Monad instances.
-description:   Random variable library, with Functor, Applicative and Monad instances.
-cabal-version: >= 1.2
-build-type:    Simple
-category: 
-license:       GPL
+name:              rand-vars
+version:           0.1
+author:            Romain Edelmann
+maintainer:        Romain Edelmann
+synopsis:          Random variable library, with Functor, Applicative and Monad instances.
+description:       Random variable library, with Functor, Applicative and Monad instances.
+cabal-version:     >= 1.6
+build-type:        Simple
+category:          Random
+license:           BSD3
+license-file:      LICENSE
+
+source-repository head
+  type:            git
+  location:        https://github.com/redelmann/haskell-rand-vars
 
 library
   build-depends:   base >=4.0 && <5.0, 
