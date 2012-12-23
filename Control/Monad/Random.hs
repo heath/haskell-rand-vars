@@ -7,8 +7,7 @@
 --
 --   The following is an example of generating combinations for a slot machine.
 --
--- > import Rand
--- > import System.Random
+-- > import Control.Monad.Random
 -- > import Control.Applicative
 -- > import Control.Monad
 -- >
@@ -30,7 +29,8 @@
 -- >
 -- >
 -- > aTripToAMachine = do
--- >           combination <- fromFreqs [fairCombination `withFreq` 10, biasedCombination `withFreq` 5]
+-- >           combination <- fromFreqs [fairCombination `withFreq` 10, 
+-- >                                     biasedCombination `withFreq` 5]
 -- >           rounds      <- inRange (5, 50)
 -- >           replicateM rounds combination
 -- >
@@ -39,7 +39,7 @@
 -- >           fmap concat $ replicateM trips aTripToAMachine
 -- >
 -- > main = pick aTripToTheCasino >>= print
-module Rand(
+module Control.Monad.Random(
 	-- * MonadRand class
 	MonadRand(..),
 	-- * Rand Monad
@@ -75,6 +75,8 @@ instance MonadRand IO where
 		setStdGen g'
 		return x
 
+
+
 -- | Random variable of @a@.
 newtype Rand a = Rand { runRand :: RandomGen g => g -> (a, g) }
 
@@ -95,7 +97,6 @@ instance Applicative Rand where
 instance MonadRand Rand where
 	pick = id
 
-
 -- | Run the random variable and returns only its value.
 --   The new generator is lost.
 evalRand :: RandomGen g => Rand a -> g -> a
@@ -105,62 +106,6 @@ evalRand v g = fst $ v `runRand` g
 execRand :: RandomGen g => Rand a -> g -> g
 execRand v g = snd $ v `runRand` g
 
-newtype RandT m a = RandT { runRandT :: RandomGen g => g -> m (a, g) }
-
-instance Functor m => Functor (RandT m) where
-	fmap f r = RandT (\g -> fmap (\(x, g') -> (f x, g')) $ r `runRandT` g)
-
-instance Applicative m => Applicative (RandT m) where
-	pure x = RandT (\g -> pure (x, g))
-	f <*> x = RandT (\g -> let (g', g'') = split g in fmap (\(h, g3') -> (\x -> (h x, g3'))) (f `runRandT` g') <*> fmap fst (x `runRandT` g''))
-
-instance Monad m => Monad (RandT m) where
-	return x = RandT (\g -> return (x, g))
-	r >>= f = RandT (\g -> r `runRandT` g >>= (\(x, g') -> f x `runRandT` g'))
-	fail err = RandT (\_ -> fail err)
-
-instance Monad m => MonadRand (RandT m) where
-	pick r = RandT (\g -> return $ r `runRand` g)
-
-instance MonadTrans RandT where
-	lift m = RandT (\g -> m >>= (\x -> return (x, g)))
-
-instance MonadReader r m => MonadReader r (RandT m) where
-	ask = lift ask
-	local f m = RandT (\g -> do
-		(x, g') <- m `runRandT` g
-		y <- local f (return x)
-		return (y, g'))
-
-instance MonadWriter w m => MonadWriter w (RandT m) where
-	tell = lift . tell
-	listen r = RandT (\g -> do
-		((x, g'), w) <- listen $ r `runRandT` g
-		return ((x, w), g'))
-	pass r = RandT (\g -> pass $ do
-		((x, f), g') <- r `runRandT` g
-		return ((x, g'), f))
-
-instance MonadState s m => MonadState s (RandT m) where
-	get = lift get
-	put = lift . put
-
-instance MonadIO m => MonadIO (RandT m) where
-    liftIO = lift . liftIO
-
-instance MonadPlus m => MonadPlus (RandT m) where
-	mzero = lift mzero
-	mplus a b = RandT (\g -> let (g', g'') = split g in (a `runRandT` g') `mplus` (b `runRandT` g'')) 
-
-
-
--- | Similar to 'evalRand'.
-evalRandT :: (RandomGen g, Monad m) => RandT m a -> g -> m a
-evalRandT r g = (r `runRandT` g) >>= (\(x, _) -> return x)
-
--- | Similar to 'execRand'.
-execRandT :: (RandomGen g, Monad m) => RandT m a -> g -> m g
-execRandT r g = (r `runRandT` g) >>= (\(_, g') -> return g')
 
 
 -- | Equiprobable distribution among the elements of the list.
@@ -201,9 +146,71 @@ fromFreqs fs = Rand (\g ->
 		preprocess = map (\(x, f) -> (x, toRational f)) . filter ((>0) . snd)
 
 		computeIntervals _ [] = undefined
-		computeIntervals lower ((v, f):[]) = let upper = (lower + f) in (IM.ClosedInterval lower upper, v):[]
-		computeIntervals lower ((v, f):xs) = let upper = (lower + f) in (IM.IntervalCO lower upper, v):(computeIntervals upper xs)
+		computeIntervals lower ((v, f):[]) = let upper = (lower + f) in 
+			(IM.ClosedInterval lower upper, v):[]
+		computeIntervals lower ((v, f):xs) = let upper = (lower + f) in 
+			(IM.IntervalCO lower upper, v):(computeIntervals upper xs)
 
 -- | Alias for @(,)@.
 withFreq :: Real b => a -> b -> (a, b)
 withFreq = (,)
+
+
+
+newtype RandT m a = RandT { runRandT :: RandomGen g => g -> m (a, g) }
+
+instance Functor m => Functor (RandT m) where
+	fmap f r = RandT (\g -> fmap (\(x, g') -> (f x, g')) $ r `runRandT` g)
+
+instance Applicative m => Applicative (RandT m) where
+	pure x = RandT (\g -> pure (x, g))
+	f <*> x = RandT (\g -> let (g', g'') = split g in 
+		fmap (\(h, g3') -> (\x -> (h x, g3'))) (f `runRandT` g') <*> 
+		fmap fst (x `runRandT` g''))
+
+instance Monad m => Monad (RandT m) where
+	return x = RandT (\g -> return (x, g))
+	r >>= f = RandT (\g -> r `runRandT` g >>= (\(x, g') -> f x `runRandT` g'))
+	fail err = RandT (\_ -> fail err)
+
+instance Monad m => MonadRand (RandT m) where
+	pick r = RandT (\g -> return $ r `runRand` g)
+
+instance MonadTrans RandT where
+	lift m = RandT (\g -> m >>= (\x -> return (x, g)))
+
+instance MonadReader r m => MonadReader r (RandT m) where
+	ask = lift ask
+	local f m = RandT (\g -> do
+		(x, g') <- m `runRandT` g
+		y <- local f (return x)
+		return (y, g'))
+
+instance MonadWriter w m => MonadWriter w (RandT m) where
+	tell = lift . tell
+	listen r = RandT (\g -> do
+		((x, g'), w) <- listen $ r `runRandT` g
+		return ((x, w), g'))
+	pass r = RandT (\g -> pass $ do
+		((x, f), g') <- r `runRandT` g
+		return ((x, g'), f))
+
+instance MonadState s m => MonadState s (RandT m) where
+	get = lift get
+	put = lift . put
+
+instance MonadIO m => MonadIO (RandT m) where
+    liftIO = lift . liftIO
+
+instance MonadPlus m => MonadPlus (RandT m) where
+	mzero = lift mzero
+	mplus a b = RandT (\g -> let (g', g'') = split g in 
+		(a `runRandT` g') `mplus` (b `runRandT` g'')) 
+
+-- | Similar to 'evalRand'.
+evalRandT :: (RandomGen g, Monad m) => RandT m a -> g -> m a
+evalRandT r g = (r `runRandT` g) >>= (\(x, _) -> return x)
+
+-- | Similar to 'execRand'.
+execRandT :: (RandomGen g, Monad m) => RandT m a -> g -> m g
+execRandT r g = (r `runRandT` g) >>= (\(_, g') -> return g')

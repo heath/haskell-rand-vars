@@ -15,5 +15,5 @@ library
                    array >= 0.4.0.0,
                    random >= 1.0,
                    IntervalMap >= 0.3
-  exposed-modules: Rand
+  exposed-modules: Control.Monad.Random
   extensions:      Rank2Types
