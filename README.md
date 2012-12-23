@@ -1,4 +1,4 @@
-Haskell - Rand-Vars
+Haskell - rand-vars
 ===================
 
 This library provides the `Rand` applicative monad. 
