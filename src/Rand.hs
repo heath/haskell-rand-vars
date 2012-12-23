@@ -1,4 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | This module provides efficient and intuitive ways to build and manipulate random variables of all kinds.
 --
@@ -35,21 +38,42 @@
 -- >           trips <- fmap (*3) $ inRange (1, 10)
 -- >           fmap concat $ replicateM trips aTripToAMachine
 -- >
--- > main = evalRandIO aTripToTheCasino >>= print
+-- > main = pick aTripToTheCasino >>= print
 module Rand(
+	-- * MonadRand class
+	MonadRand(..),
+	-- * Rand Monad
 	Rand(..), 
-	-- * Evaluation
-	evalRand, execRand, evalRandIO,
-	-- * Creation
+	evalRand, execRand,
+	-- * Creation of random variables
 	rand, oneOf, inRange,
-	fromFreqs, withFreq
+	fromFreqs, withFreq,
+	-- * RandT Monad
+	RandT(..),
+	evalRandT, execRandT
 	) where
 
 import System.Random
 import Data.Array.IArray ((!), listArray, Array)
 import Control.Applicative
+import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.Reader.Class
+import Control.Monad.State.Class
+import Control.Monad.Writer.Class
 import Data.List (foldl', find)
 import qualified Data.IntervalMap as IM
+
+-- | Class of monads supporting the return of a random element.
+class Monad m => MonadRand m where
+	pick :: Rand a -> m a
+
+instance MonadRand IO where
+	pick r = do
+		g <- getStdGen
+		let (x, g') = r `runRand` g
+		setStdGen g'
+		return x
 
 -- | Random variable of @a@.
 newtype Rand a = Rand { runRand :: RandomGen g => g -> (a, g) }
@@ -63,9 +87,13 @@ instance Functor Rand where
 
 instance Applicative Rand where
 	pure = return
-	f <*> x = Rand (\g -> 
-		let (h, g') = f `runRand` g in 
-		let (a, g'') = x `runRand` g' in (h a, g''))
+	f <*> x = do
+		h <- f
+		a <- x
+		return (h a)
+
+instance MonadRand Rand where
+	pick = id
 
 
 -- | Run the random variable and returns only its value.
@@ -77,14 +105,63 @@ evalRand v g = fst $ v `runRand` g
 execRand :: RandomGen g => Rand a -> g -> g
 execRand v g = snd $ v `runRand` g
 
--- | Run the random variable and returns only its value.
---   The new generator is set as the standart generator.
-evalRandIO :: Rand a -> IO a
-evalRandIO r = do
-	g <- getStdGen
-	let (x, g') = r `runRand` g
-	setStdGen g'
-	return x
+newtype RandT m a = RandT { runRandT :: RandomGen g => g -> m (a, g) }
+
+instance Functor m => Functor (RandT m) where
+	fmap f r = RandT (\g -> fmap (\(x, g') -> (f x, g')) $ r `runRandT` g)
+
+instance Applicative m => Applicative (RandT m) where
+	pure x = RandT (\g -> pure (x, g))
+	f <*> x = RandT (\g -> let (g', g'') = split g in fmap (\(h, g3') -> (\x -> (h x, g3'))) (f `runRandT` g') <*> fmap fst (x `runRandT` g''))
+
+instance Monad m => Monad (RandT m) where
+	return x = RandT (\g -> return (x, g))
+	r >>= f = RandT (\g -> r `runRandT` g >>= (\(x, g') -> f x `runRandT` g'))
+	fail err = RandT (\_ -> fail err)
+
+instance Monad m => MonadRand (RandT m) where
+	pick r = RandT (\g -> return $ r `runRand` g)
+
+instance MonadTrans RandT where
+	lift m = RandT (\g -> m >>= (\x -> return (x, g)))
+
+instance MonadReader r m => MonadReader r (RandT m) where
+	ask = lift ask
+	local f m = RandT (\g -> do
+		(x, g') <- m `runRandT` g
+		y <- local f (return x)
+		return (y, g'))
+
+instance MonadWriter w m => MonadWriter w (RandT m) where
+	tell = lift . tell
+	listen r = RandT (\g -> do
+		((x, g'), w) <- listen $ r `runRandT` g
+		return ((x, w), g'))
+	pass r = RandT (\g -> pass $ do
+		((x, f), g') <- r `runRandT` g
+		return ((x, g'), f))
+
+instance MonadState s m => MonadState s (RandT m) where
+	get = lift get
+	put = lift . put
+
+instance MonadIO m => MonadIO (RandT m) where
+    liftIO = lift . liftIO
+
+instance MonadPlus m => MonadPlus (RandT m) where
+	mzero = lift mzero
+	mplus a b = RandT (\g -> let (g', g'') = split g in (a `runRandT` g') `mplus` (b `runRandT` g'')) 
+
+
+
+-- | Similar to 'evalRand'.
+evalRandT :: (RandomGen g, Monad m) => RandT m a -> g -> m a
+evalRandT r g = (r `runRandT` g) >>= (\(x, _) -> return x)
+
+-- | Similar to 'execRand'.
+execRandT :: (RandomGen g, Monad m) => RandT m a -> g -> m g
+execRandT r g = (r `runRandT` g) >>= (\(_, g') -> return g')
+
 
 -- | Equiprobable distribution among the elements of the list.
 oneOf :: [a] -> Rand a
@@ -94,11 +171,11 @@ oneOf xs = fmap ((!)arr) $ inRange range
 		range = (0, length xs - 1)
 		arr = (listArray range :: [a] -> Array Int a) xs
 
--- | Distribution provided by @random@.
+-- | Distribution provided by 'random'.
 rand :: Random a => Rand a
 rand = Rand random
 
--- | Distribution within a given range, provided by @randomR@.
+-- | Distribution within a given range, provided by 'randomR'.
 inRange :: Random a => (a, a) -> Rand a
 inRange r = Rand (\g -> randomR r g)
 
@@ -129,4 +206,4 @@ fromFreqs fs = Rand (\g ->
 
 -- | Alias for @(,)@.
 withFreq :: Real b => a -> b -> (a, b)
-withFreq = (,) 
+withFreq = (,)
