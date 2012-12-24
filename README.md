@@ -69,7 +69,7 @@ pick :: MonadRand m => Rand a -> m a
 
 `IO`, `Rand` and `RandT`, are instances of `MonadRand`.
 
-# Code Example
+# Code example
 
 The following is a more complete example on the Casino theme!
 
@@ -87,11 +87,11 @@ fairSlot = oneOf [Lemon .. Seven]
 fairCombination = Combination <$> fairSlot <*> fairSlot <*> fairSlot
 
 biasedSlot = fromFreqs [Lemon `withFreq` 1, 
-                       Cherry `withFreq` 1, 
-                       Strawberry `withFreq` 1.2, 
-                       Orange `withFreq` 1.1,
-                       Bar `withFreq` 0.9,
-                       Seven `withFreq` 0.8]
+                        Cherry `withFreq` 1, 
+                        Strawberry `withFreq` 1.2, 
+                        Orange `withFreq` 1.1,
+                        Bar `withFreq` 0.9,
+                        Seven `withFreq` 0.8]
 
 biasedCombination = Combination <$> biasedSlot <*> biasedSlot <*> biasedSlot
 
