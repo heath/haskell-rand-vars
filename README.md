@@ -22,8 +22,11 @@ decision = rand
 ## `inRange`
 
 `inRange` returns an element at random from the specified range. The distribution follows the one of the underlying `Random` instance.
+
+```haskell
 die :: Rand Int
 die = inRange (1, 6)
+```
 
 ## `oneOf`
 
