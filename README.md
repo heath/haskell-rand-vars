@@ -6,7 +6,7 @@ The distribution of values can be specified using provided functions.
 
 A monad transformer, `RandT`, is also available.
 
-The class `MonadRand` allows to pick an element at random out of `Rand`. Instances for `Rand`, `RandT` and `IO` are provided.
+The class `RandPicker` allows to pick an element at random out of `Rand`. Instances for `Rand`, `RandT` and `IO` are provided.
 
 # Creation of random variables
 
@@ -61,13 +61,29 @@ Note that `withFreq` is simply an alias for `(,)`, the pair constructor.
 
 # Picking value from random variables.
 
-Any monad that has an instance of `MonadRand` can pick an element at random out of a random variable. To do so, simple use the `pick` function.
+Any monad that has an instance of `RandPicker` can pick an element at random out of a random variable. To do so, simple use the `pick` function.
 
 ```haskell
-pick :: MonadRand m => Rand a -> m a
+pick :: RandPicker m => Rand a -> m a
 ```
 
-`IO`, `Rand` and `RandT`, are instances of `MonadRand`.
+`IO`, `Rand` and `RandT`, are instances of `RandPicker`.
+
+## `MonadRand`
+
+For convenience, `MonadRand` can be used to express the contraint that the `RandPicker` must also be a `Monad`.
+
+Meaning that, instead of:
+
+```haskell
+foo :: (RandPicker m, Monad m) => ...
+```
+
+One can write:
+
+```haskell
+foo :: (MonadRand m) => ...
+```
 
 # Code example
 
