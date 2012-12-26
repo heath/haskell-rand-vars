@@ -43,6 +43,7 @@
 module Control.Monad.Random(
 	-- * RandPicker class
 	RandPicker(..),
+	MonadRand,
 	-- * Rand Monad
 	Rand(..), 
 	evalRand, execRand,
