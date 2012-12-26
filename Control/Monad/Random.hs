@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 -- | This module provides efficient and intuitive ways to build and manipulate random variables of all kinds.
 --
@@ -40,8 +41,8 @@
 -- >
 -- > main = pick aTripToTheCasino >>= print
 module Control.Monad.Random(
-	-- * MonadRand class
-	MonadRand(..),
+	-- * RandPicker class
+	RandPicker(..),
 	-- * Rand Monad
 	Rand(..), 
 	evalRand, execRand,
@@ -61,14 +62,15 @@ import Control.Monad.Trans
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 import Control.Monad.Writer.Class
-import Data.List (foldl', find)
 import qualified Data.IntervalMap as IM
 
--- | Class of monads supporting the return of a random element.
-class Monad m => MonadRand m where
+-- | Class supporting the return of a random element.
+class RandPicker m where
 	pick :: Rand a -> m a
 
-instance MonadRand IO where
+type MonadRand m = (Monad m, RandPicker m)
+
+instance RandPicker IO where
 	pick r = do
 		g <- getStdGen
 		let (x, g') = r `runRand` g
@@ -94,7 +96,7 @@ instance Applicative Rand where
 		a <- x
 		return (h a)
 
-instance MonadRand Rand where
+instance RandPicker Rand where
 	pick = id
 
 -- | Run the random variable and returns only its value.
@@ -173,7 +175,7 @@ instance Monad m => Monad (RandT m) where
 	r >>= f = RandT (\g -> r `runRandT` g >>= (\(x, g') -> f x `runRandT` g'))
 	fail err = RandT (\_ -> fail err)
 
-instance Monad m => MonadRand (RandT m) where
+instance Monad m => RandPicker (RandT m) where
 	pick r = RandT (\g -> return $ r `runRand` g)
 
 instance MonadTrans RandT where
