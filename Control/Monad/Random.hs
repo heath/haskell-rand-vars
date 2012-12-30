@@ -59,6 +59,7 @@ import System.Random
 import Data.Array.IArray ((!), listArray, Array)
 import Control.Applicative
 import Control.Monad
+import Control.Arrow (first, second)
 import Control.Monad.Trans
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
@@ -113,7 +114,7 @@ execRand v g = snd $ v `runRand` g
 
 -- | Equiprobable distribution among the elements of the list.
 oneOf :: [a] -> Rand a
-oneOf xs = fmap ((!)arr) $ inRange range
+oneOf xs = fmap (arr !) $ inRange range
 	where 
 		-- Creating an array for constant time lookup.
 		range = (0, length xs - 1)
@@ -125,7 +126,7 @@ rand = Rand random
 
 -- | Distribution within a given range, provided by 'randomR'.
 inRange :: Random a => (a, a) -> Rand a
-inRange r = Rand (\g -> randomR r g)
+inRange r = Rand (randomR r)
 
 -- | Distribution of elements proportionately to their indicated frequency.
 fromFreqs :: Real b => [(a, b)] -> Rand a
@@ -135,7 +136,7 @@ fromFreqs fs = Rand (\g ->
 	let ratio      = freqSum / range in
 	let (i, g')    = next g in
 	let j          = (*) ratio $ toRational (i - from) in
-	case (IM.containing) intervalMap j of
+	case IM.containing intervalMap j of
 		[(_, x)] -> (x, g')
 		_        -> error "Index not in the map."
 	)
@@ -146,13 +147,13 @@ fromFreqs fs = Rand (\g ->
 
 		intervalMap = IM.fromAscList $ computeIntervals 0 elems
 
-		preprocess = map (\(x, f) -> (x, toRational f)) . filter ((>0) . snd)
+		preprocess = map (second toRational) . filter ((>0) . snd)
 
 		computeIntervals _ [] = undefined
 		computeIntervals lower ((v, f):[]) = let upper = (lower + f) in 
-			(IM.ClosedInterval lower upper, v):[]
+			[(IM.ClosedInterval lower upper, v)]
 		computeIntervals lower ((v, f):xs) = let upper = (lower + f) in 
-			(IM.IntervalCO lower upper, v):(computeIntervals upper xs)
+			(IM.IntervalCO lower upper, v):computeIntervals upper xs
 
 -- | Alias for @(,)@.
 withFreq :: Real b => a -> b -> (a, b)
@@ -163,17 +164,17 @@ withFreq = (,)
 newtype RandT m a = RandT { runRandT :: RandomGen g => g -> m (a, g) }
 
 instance Functor m => Functor (RandT m) where
-	fmap f r = RandT (\g -> fmap (\(x, g') -> (f x, g')) $ r `runRandT` g)
+	fmap f r = RandT (\g -> fmap (first f) $ r `runRandT` g)
 
 instance Applicative m => Applicative (RandT m) where
 	pure x = RandT (\g -> pure (x, g))
 	f <*> x = RandT (\g -> let (g', g'') = split g in 
-		fmap (\(h, g3') -> (\x -> (h x, g3'))) (f `runRandT` g') <*> 
+		fmap (\(h, g3') x -> (h x, g3')) (f `runRandT` g') <*> 
 		fmap fst (x `runRandT` g''))
 
 instance Monad m => Monad (RandT m) where
 	return x = RandT (\g -> return (x, g))
-	r >>= f = RandT (\g -> r `runRandT` g >>= (\(x, g') -> f x `runRandT` g'))
+	r >>= f = RandT (runRandT r >=> (\(x, g) -> f x `runRandT` g))
 	fail err = RandT (\_ -> fail err)
 
 instance Monad m => RandPicker (RandT m) where
